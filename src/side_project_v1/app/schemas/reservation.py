@@ -56,3 +56,15 @@ class RoomBooking(BaseModel):
     reservations: list[RoomPeriod] = Field(
         ..., description="All distinct requested accommodation blocks."
     )
+
+
+class UpdateReservation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    arrival_date: date | None = None
+    departure_date: date | None = None
+    num_rooms: int | None = Field(default=None, ge=1)
+    num_adults: int | None = Field(default=None, ge=0)
+    num_children: int | None = Field(default=None, ge=0)
+    children_ages: list[int] = Field(default_factory=list)
+    room_type: str | None = None
