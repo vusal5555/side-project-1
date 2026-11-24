@@ -1,0 +1,46 @@
+[
+  {
+    "id": 1,
+    "email": "Hello, I need 2 rooms from December 12 to December 15, 2026, for 4 adults.",
+    "email_date": "2026-11-23",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-12-12",
+          "departure_date": "2026-12-15",
+          "num_rooms": 2,
+          "num_adults": 4,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": null
+        }
+      ]
+    }
+  },
+  {
+    "id": 2,
+    "email": "I'd like one room from December 20 to December 22, 2026.",
+    "email_date": "2026-11-23",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-12-20",
+          "departure_date": "2026-12-22",
+          "num_rooms": 1,
+          "num_adults": null,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": null
+        }
+      ]
+    }
+  },
+  {
+    "id": 3,
+    "email": "We need a conference room for 20 people tomorrow. No hotel bedrooms required.",
+    "email_date": "2026-11-23",
+    "expected": {
+      "reservations": []
+    }
+  }
+]

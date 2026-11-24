@@ -1,0 +1,29 @@
+[project]
+name = "side-project-v1"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.15"
+dependencies = [
+    "fastapi[standard]>=0.165.0",
+    "langchain>=1.5.2",
+    "langchain-openai>=1.8.5",
+    "python-dotenv>=1.2.4",
+]
+
+[project.scripts]
+side-project-v1 = "side_project_v1:main"
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.pytest.ini_options]
+pythonpath = ["src/side_project_v1"]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.2.0",
+]
