@@ -18,7 +18,7 @@ class RoomPeriod(BaseModel):
 
     num_rooms: int | None = Field(
         ...,
-        ge=0,
+        ge=1,
         description="Number of requested rooms, or null if unknown.",
     )
 
@@ -26,8 +26,11 @@ class RoomPeriod(BaseModel):
         ...,
         ge=0,
         description=(
-            "Number of adults. Return null if unknown. "
-            "Do not assume one adult per room."
+            "Total number of adults for this reservation block. "
+            "For single rooms or rooms explicitly requested for single use, "
+            "assign one adult per room unless otherwise specified. "
+            "For double, twin, and other rooms, do not assume occupancy. "
+            "Return null if genuinely unknown."
         ),
     )
 
@@ -46,7 +49,13 @@ class RoomPeriod(BaseModel):
 
     room_type: str | None = Field(
         ...,
-        description="Explicitly requested room type, or null if unknown.",
+        description=(
+            "Extract the requested hotel room category as a string. "
+            "Preserve meaningful category names and details. "
+            "Exclude breakfast, meal plans, and unrelated guest preferences. "
+            "Do not treat amenities alone as room types. "
+            "Return null if no room category is specified."
+        ),
     )
 
 

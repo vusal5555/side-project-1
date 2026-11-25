@@ -725,6 +725,12 @@ wheels = [
 ]
 
 [[package]]
+name = "munkres"
+version = "3.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/19/e4/c5cc64941985d8f9fc0291ebf88329709f4df44f745e8e8c999c6e19e03f/munkres-3.0.0.tar.gz", hash = "sha256:21f8a04bc28b34bbefc35d4af824b3d70de2f3d37d655da0a1474e5c2ba341bf", size = 252231, upload-time = "2026-10-18T13:46:56.855Z" }
+
+[[package]]
 name = "openai"
 version = "3.57.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1282,6 +1288,7 @@ dependencies = [
     { name = "fastapi", extra = ["standard"] },
     { name = "langchain" },
     { name = "langchain-openai" },
+    { name = "munkres" },
     { name = "psycopg", extra = ["binary"] },
     { name = "python-dotenv" },
     { name = "sqlalchemy" },
@@ -1299,6 +1306,7 @@ requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.165.0" },
     { name = "langchain", specifier = ">=1.5.2" },
     { name = "langchain-openai", specifier = ">=1.8.5" },
+    { name = "munkres", specifier = ">=3.0.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.9" },
     { name = "python-dotenv", specifier = ">=1.2.4" },
     { name = "sqlalchemy", specifier = ">=2.1.9" },

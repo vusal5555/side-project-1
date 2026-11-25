@@ -1,32 +1,13 @@
 [
   {
-    "id": 1,
-    "email": "Hello, I need 2 rooms from December 12 to December 15, 2026, for 4 adults.",
-    "email_date": "2026-11-23",
+    "email": "I am organizing a meeting for our department and want to request 20 rooms and a meeting room for 20 people for February 26, 2026, for 2 nights. The meeting is on February 26 and 27, with two coffee breaks and lunch. Departure will be February 28.",
+    "email_date": "2026-01-21",
     "expected": {
       "reservations": [
         {
-          "arrival_date": "2026-12-12",
-          "departure_date": "2026-12-15",
-          "num_rooms": 2,
-          "num_adults": 4,
-          "num_children": null,
-          "children_ages": [],
-          "room_type": null
-        }
-      ]
-    }
-  },
-  {
-    "id": 2,
-    "email": "I'd like one room from December 20 to December 22, 2026.",
-    "email_date": "2026-11-23",
-    "expected": {
-      "reservations": [
-        {
-          "arrival_date": "2026-12-20",
-          "departure_date": "2026-12-22",
-          "num_rooms": 1,
+          "arrival_date": "2026-02-26",
+          "departure_date": "2026-02-28",
+          "num_rooms": 20,
           "num_adults": null,
           "num_children": null,
           "children_ages": [],
@@ -36,11 +17,371 @@
     }
   },
   {
-    "id": 3,
-    "email": "We need a conference room for 20 people tomorrow. No hotel bedrooms required.",
-    "email_date": "2026-11-23",
+    "email": "Please check availability for the following group booking: 2 Single rooms and 8 Twin rooms. Check-in Monday 15 June 2026, check-out Tuesday 16 June 2026 (one night). Please send an offer.",
+    "email_date": "2026-01-22",
     "expected": {
-      "reservations": []
+      "reservations": [
+        {
+          "arrival_date": "2026-06-15",
+          "departure_date": "2026-06-16",
+          "num_rooms": 2,
+          "num_adults": 2,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": "single room"
+        },
+        {
+          "arrival_date": "2026-06-15",
+          "departure_date": "2026-06-16",
+          "num_rooms": 8,
+          "num_adults": null,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": "twin room"
+        }
+      ]
+    }
+  },
+  {
+    "email": "Please reserve one single room on a standard floor for a guest. Check-in 26.01.2026, check-out 27.01.2026. Kindly confirm.",
+    "email_date": "2026-01-20",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-01-26",
+          "departure_date": "2026-01-27",
+          "num_rooms": 1,
+          "num_adults": 1,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": "single room"
+        }
+      ]
+    }
+  },
+  {
+    "email": "Good morning, I am looking for availability and rates from February 25 to March 3, 2026, or nearby dates. Junior Suite or Royal Suite for 1 person only, including breakfast. A flexible rate with free cancellation would be ideal.",
+    "email_date": "2026-01-20",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-02-25",
+          "departure_date": "2026-03-03",
+          "num_rooms": 1,
+          "num_adults": 1,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": null
+        }
+      ]
+    }
+  },
+  {
+    "email": "I am planning a business trip to Berlin from April 26 to April 28, 2026, for 1 person. Is it possible to reserve accommodation and send an invoice to my employer?",
+    "email_date": "2026-01-20",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-04-26",
+          "departure_date": "2026-04-28",
+          "num_rooms": null,
+          "num_adults": 1,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": null
+        }
+      ]
+    }
+  },
+  {
+    "email": "Booking dates: Destination Leuven. From 2026-03-21 to 2026-03-22. People: 1. Rooms: 1. Could you provide availability?",
+    "email_date": "2026-01-20",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-03-21",
+          "departure_date": "2026-03-22",
+          "num_rooms": 1,
+          "num_adults": 1,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": null
+        }
+      ]
+    }
+  },
+  {
+    "email": "Hallo, was kostet eine Übernachtung vom 6.3.2026 auf den 7.3.2026 für 2 Personen mit Frühstück und Parken vom 6.3. bis 21.3.?",
+    "email_date": "2026-01-21",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-03-06",
+          "departure_date": "2026-03-07",
+          "num_rooms": null,
+          "num_adults": 2,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": null
+        }
+      ]
+    }
+  },
+  {
+    "email": "Thank you for the reply. Our first group has been reduced, so we only need 5 Twin rooms now. Stay dates: February 23 to February 24, 2026. Is the price still the same?",
+    "email_date": "2026-01-20",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-02-23",
+          "departure_date": "2026-02-24",
+          "num_rooms": 5,
+          "num_adults": null,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": "twin room"
+        }
+      ]
+    }
+  },
+  {
+    "email": "Could you please let me know if rooms are available from February 5 through February 11, 2026? I would appreciate information about availability and price.",
+    "email_date": "2026-01-22",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-02-05",
+          "departure_date": "2026-02-11",
+          "num_rooms": null,
+          "num_adults": null,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": null
+        }
+      ]
+    }
+  },
+  {
+    "email": "I would like to ask about the government rate for a stay with check-in on Friday, March 6, 2026, and check-out on Friday, March 13, 2026. Please let me know the applicable rate and booking requirements.",
+    "email_date": "2026-01-23",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-03-06",
+          "departure_date": "2026-03-13",
+          "num_rooms": null,
+          "num_adults": null,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": null
+        }
+      ]
+    }
+  },
+  {
+    "email": "I would like to book 4 rooms with breakfast, 1 person in each room. We are arriving on April 7, 2026 for 3 nights. Please quote a rate per room.",
+    "email_date": "2026-01-21",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-04-07",
+          "departure_date": "2026-04-10",
+          "num_rooms": 4,
+          "num_adults": 4,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": null
+        }
+      ]
+    }
+  },
+  {
+    "email": "We have a booking for a summit happening in February and would like to book two rooms for February 9–12, 2026: 2 single rooms.",
+    "email_date": "2026-01-21",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-02-09",
+          "departure_date": "2026-02-12",
+          "num_rooms": 2,
+          "num_adults": 2,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": "single room"
+        }
+      ]
+    }
+  },
+  {
+    "email": "Good day, we need 3 rooms for 1 person each, from 03.02.2026 to 06.02.2026, with breakfast. Could you give us availability and price?",
+    "email_date": "2026-01-21",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-02-03",
+          "departure_date": "2026-02-06",
+          "num_rooms": 3,
+          "num_adults": 3,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": null
+        }
+      ]
+    }
+  },
+  {
+    "email": "Please advise your travel agent rate for the following dates: 22 January 2026 to 23 January 2026. Guests: two adults. Rooms: 1.",
+    "email_date": "2026-01-21",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-01-22",
+          "departure_date": "2026-01-23",
+          "num_rooms": 1,
+          "num_adults": 2,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": null
+        }
+      ]
+    }
+  },
+  {
+    "email": "We would like to book 9 rooms for 16–20 July 2026 (4 nights): 07 Standard Twin rooms with two single beds, each used by 2 adults, and 02 Standard Double rooms, each used by 1 adult. Total 9 rooms / 16 people. Please include breakfast.",
+    "email_date": "2026-01-22",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-07-16",
+          "departure_date": "2026-07-20",
+          "num_rooms": 7,
+          "num_adults": 14,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": "Standard Twin room"
+        },
+        {
+          "arrival_date": "2026-07-16",
+          "departure_date": "2026-07-20",
+          "num_rooms": 2,
+          "num_adults": 2,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": "Standard Double room"
+        }
+      ]
+    }
+  },
+  {
+    "email": "Dear team, I would like to book 3 double rooms + 2 twin rooms + 1 double room for single use. Check-in 23 March 2026, check-out 25 March 2026. Please advise a flexible rate with breakfast.",
+    "email_date": "2026-01-21",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-03-23",
+          "departure_date": "2026-03-25",
+          "num_rooms": 3,
+          "num_adults": null,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": "double room"
+        },
+        {
+          "arrival_date": "2026-03-23",
+          "departure_date": "2026-03-25",
+          "num_rooms": 2,
+          "num_adults": null,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": "twin room"
+        },
+        {
+          "arrival_date": "2026-03-23",
+          "departure_date": "2026-03-25",
+          "num_rooms": 1,
+          "num_adults": 1,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": "double room"
+        }
+      ]
+    }
+  },
+  {
+    "email": "For May 21–24, 2026, I am looking into a one-bedroom apartment premier with balcony and 4 additional standard rooms (studios). Could you offer a small-group rate and late checkout?",
+    "email_date": "2026-01-22",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-05-21",
+          "departure_date": "2026-05-24",
+          "num_rooms": 1,
+          "num_adults": null,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": "one-bedroom apartment premier"
+        },
+        {
+          "arrival_date": "2026-05-21",
+          "departure_date": "2026-05-24",
+          "num_rooms": 4,
+          "num_adults": null,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": "standard studio"
+        }
+      ]
+    }
+  },
+  {
+    "email": "I would like to request the best available rate for February 22–25, 2026. Number of guests: 7 adults. Accommodation: rooms for 7 adults. Bed and breakfast requested.",
+    "email_date": "2026-01-23",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-02-22",
+          "departure_date": "2026-02-25",
+          "num_rooms": null,
+          "num_adults": 7,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": null
+        }
+      ]
+    }
+  },
+  {
+    "email": "May I book another room on behalf of one guest, please? Check-in January 26, 2026, check-out January 27, 2026. Can you confirm that a Comfort Room is available? Please include breakfast.",
+    "email_date": "2026-01-26",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-01-26",
+          "departure_date": "2026-01-27",
+          "num_rooms": 1,
+          "num_adults": 1,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": "Comfort Room"
+        }
+      ]
+    }
+  },
+  {
+    "email": "Please advise the corporate rate for October 25 to November 1, 2026. Occupancy: single. I would like a kitchenette and breakfast included.",
+    "email_date": "2026-09-17",
+    "expected": {
+      "reservations": [
+        {
+          "arrival_date": "2026-10-25",
+          "departure_date": "2026-11-01",
+          "num_rooms": null,
+          "num_adults": 1,
+          "num_children": null,
+          "children_ages": [],
+          "room_type": null
+        }
+      ]
     }
   }
 ]
