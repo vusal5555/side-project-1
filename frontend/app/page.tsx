@@ -1,11 +1,14 @@
 import { Suspense } from "react";
+import { auth } from "@clerk/nextjs/server";
 import EnquiriesDashboard, {
   type EnquirySummary,
-} from "../components/enquiries-dashboard";
+} from "@/components/enquiries-dashboard";
 
 const API_URL = process.env.FASTAPI_URL ?? "http://127.0.0.1:8000";
 
-async function DashboardData() {
+async function ProtectedDashboard() {
+  await auth.protect();
+
   const response = await fetch(`${API_URL}/api/v1/enquiries`, {
     cache: "no-store",
   });
@@ -15,6 +18,7 @@ async function DashboardData() {
   }
 
   const enquiries: EnquirySummary[] = await response.json();
+
   return <EnquiriesDashboard enquiries={enquiries} />;
 }
 
@@ -23,11 +27,11 @@ export default function Home() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center bg-[#f5f7fb] text-sm font-medium text-slate-500">
-          Loading reservation workspace…
+          Loading reservation workspace...
         </div>
       }
     >
-      <DashboardData />
+      <ProtectedDashboard />
     </Suspense>
   );
 }
