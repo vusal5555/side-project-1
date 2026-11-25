@@ -149,11 +149,11 @@ def update_reservation(
             detail="Enquiry already approved",
         )
 
-    updates = request.model_dump(exclude_none=True)
+    updates = request.model_dump(exclude_unset=True)
 
     if not updates:
         raise HTTPException(
-            status_code=400,
+            status_code=422,
             detail="No updates provided",
         )
 

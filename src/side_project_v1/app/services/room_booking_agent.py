@@ -8,26 +8,6 @@ from side_project_v1.app.schemas.reservation import RoomBooking
 
 load_dotenv()
 
-SYSTEM_PROMPT = """
-You are an AI assistant that extracts hotel accommodation
-requests from incoming guest emails.
-
-Follow these rules:
-
-1. Extract only hotel accommodation requests.
-2. Identify all distinct reservation requests in the email.
-3. Extract information explicitly provided by the guest.
-4. Never invent missing information.
-5. Return null for unknown nullable fields.
-6. Do not assume adult counts from room types.
-7. Use the email date as context when interpreting dates.
-8. Prioritize the latest guest request over older quoted emails.
-9. Do not confuse meeting room requests with accommodation.
-10. If there is no active accommodation request, return an
-    empty reservations list.
-
-Return the information according to the provided schema.
-"""
 
 USER_MESSAGE = """
 Email date: {email_date}
@@ -36,7 +16,7 @@ Email:
 {email}
 """
 
-llm = ChatOpenAI(model="gpt-5-mini", temperature=0, api_key=os.getenv("OPENAI_API_KEY"))
+llm = ChatOpenAI(model="gpt-6-luna", temperature=1, api_key=os.getenv("OPENAI_API_KEY"))
 
 structured_llm = llm.with_structured_output(
     RoomBooking,
