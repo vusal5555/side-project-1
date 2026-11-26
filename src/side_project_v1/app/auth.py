@@ -51,12 +51,10 @@ def require_organization(request: Request):
     return org_id
 
 
-def require_org_id(request: Request):
+def require_org_admin(request: Request):
     state = get_clerk_session(request)
     org_id = state.payload.get("org_id")
     org_admin_role = state.payload.get("org_role")
-
-    print(org_id, org_admin_role)
 
     if not org_id:
         raise HTTPException(

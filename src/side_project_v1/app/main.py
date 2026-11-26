@@ -8,7 +8,11 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from side_project_v1.app.auth import require_org_id, require_organization, require_user
+from side_project_v1.app.auth import (
+    require_org_admin,
+    require_organization,
+    require_user,
+)
 from side_project_v1.app.db.models import Enquiry, Hotel, Reservation, ReviewEvent
 from side_project_v1.app.db.session import get_db
 from side_project_v1.app.schemas.reservation import UpdateReservation
@@ -30,6 +34,10 @@ class CreateHotel(BaseModel):
 class EmailRequest(BaseModel):
     email: str = Field(min_length=1)
     email_date: date
+
+
+class CreateEnquiryRequest(EmailRequest):
+    hotel_id: int = Field(gt=0)
 
 
 @app.get("/health")
@@ -63,27 +71,51 @@ def extract_reservations(request: EmailRequest):
         ) from exc
 
 
-@app.post("/api/v1/enquiries", status_code=201)
+@app.post(
+    "/api/v1/enquiries",
+    status_code=201,
+    dependencies=[Depends(require_user)],
+)
 def create_enquiry(
-    request: EmailRequest,
+    request: CreateEnquiryRequest,
     session: Session = Depends(get_db),
-    user_id: str = Depends(require_user),
+    org_id: str = Depends(require_organization),
 ):
+
+    hotel = session.scalar(
+        select(Hotel).where(
+            Hotel.id == request.hotel_id,
+            Hotel.clerk_organization_id == org_id,
+        )
+    )
+
+    if hotel is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Hotel not found",
+        )
     booking = extract_room_bookings(request.email, request.email_date)
-    enquiry = save_enquiry(session, request.email, request.email_date, booking)
+    enquiry = save_enquiry(
+        session, hotel.id, request.email, request.email_date, booking
+    )
     return {
         "id": enquiry.id,
+        "hotel_id": hotel.id,
         "status": enquiry.status,
         "reservations_count": len(booking.reservations),
     }
 
 
-@app.get("/api/v1/enquiries")
+@app.get("/api/v1/enquiries", dependencies=[Depends(require_user)])
 def get_enquiries(
-    session: Session = Depends(get_db), user_id: str = Depends(require_user)
+    session: Session = Depends(get_db),
+    org_id: str = Depends(require_organization),
 ):
     enquiries = session.scalars(
-        select(Enquiry).order_by(Enquiry.created_at.desc())
+        select(Enquiry)
+        .join(Hotel, Enquiry.hotel_id == Hotel.id)
+        .where(Hotel.clerk_organization_id == org_id)
+        .order_by(Enquiry.created_at.desc())
     ).all()
 
     return [
@@ -97,14 +129,26 @@ def get_enquiries(
     ]
 
 
-@app.get("/api/v1/enquiries/{enquiry_id}", status_code=200)
+@app.get(
+    "/api/v1/enquiries/{enquiry_id}",
+    status_code=200,
+    dependencies=[Depends(require_user)],
+)
 def get_enquiry(
     enquiry_id: int,
     session: Session = Depends(get_db),
-    user_id: str = Depends(require_user),
+    org_id: str = Depends(require_organization),
 ):
 
-    enquiry = session.get(Enquiry, enquiry_id)
+    enquiry = session.scalar(
+        select(Enquiry)
+        .join(Hotel, Enquiry.hotel_id == Hotel.id)
+        .where(
+            Enquiry.id == enquiry_id,
+            Hotel.clerk_organization_id == org_id,
+        )
+    )
+
     if not enquiry:
         raise HTTPException(status_code=404, detail="Enquiry not found")
 
@@ -125,13 +169,22 @@ def get_enquiry(
     }
 
 
-@app.post("/api/v1/enquiries/{enquiry_id}/approve")
+@app.post(
+    "/api/v1/enquiries/{enquiry_id}/approve", dependencies=[Depends(require_user)]
+)
 def approve_enquiry(
     enquiry_id: int,
     session: Session = Depends(get_db),
-    user_id: str = Depends(require_user),
+    org_id: str = Depends(require_organization),
 ):
-    enquiry = session.get(Enquiry, enquiry_id)
+    enquiry = session.scalar(
+        select(Enquiry)
+        .join(Hotel, Enquiry.hotel_id == Hotel.id)
+        .where(
+            Enquiry.id == enquiry_id,
+            Hotel.clerk_organization_id == org_id,
+        )
+    )
     if not enquiry:
         raise HTTPException(status_code=404, detail="Enquiry not found")
 
@@ -156,18 +209,33 @@ def approve_enquiry(
     }
 
 
-@app.patch("/api/v1/reservations/{reservation_id}")
+@app.patch(
+    "/api/v1/reservations/{reservation_id}", dependencies=[Depends(require_user)]
+)
 def update_reservation(
     reservation_id: int,
     request: UpdateReservation,
     session: Session = Depends(get_db),
-    user_id: str = Depends(require_user),
+    org_id: str = Depends(require_organization),
 ):
     reservation = session.get(Reservation, reservation_id)
     if not reservation:
         raise HTTPException(status_code=404, detail="Reservation not found")
 
-    enquiry = session.get(Enquiry, reservation.enquiry_id)
+    enquiry = session.scalar(
+        select(Enquiry)
+        .join(Hotel, Enquiry.hotel_id == Hotel.id)
+        .where(
+            Enquiry.id == reservation.enquiry_id,
+            Hotel.clerk_organization_id == org_id,
+        )
+    )
+
+    if enquiry is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Reservation not found",
+        )
 
     if enquiry.status == "approved":
         raise HTTPException(
@@ -212,13 +280,24 @@ def update_reservation(
     }
 
 
-@app.delete("/api/v1/enquiries/{enquiry_id}", status_code=204)
+@app.delete(
+    "/api/v1/enquiries/{enquiry_id}",
+    status_code=204,
+    dependencies=[Depends(require_user)],
+)
 def delete_enquiry(
     enquiry_id: int,
     session: Session = Depends(get_db),
-    user_id: str = Depends(require_user),
+    org_id: str = Depends(require_organization),
 ):
-    enquiry = session.get(Enquiry, enquiry_id)
+    enquiry = session.scalar(
+        select(Enquiry)
+        .join(Hotel, Enquiry.hotel_id == Hotel.id)
+        .where(
+            Enquiry.id == enquiry_id,
+            Hotel.clerk_organization_id == org_id,
+        )
+    )
 
     if enquiry is None:
         raise HTTPException(404, "Enquiry not found")
@@ -247,7 +326,7 @@ def get_hotels(
 def create_hotel(
     request: CreateHotel,
     session: Session = Depends(get_db),
-    org_id: str = Depends(require_org_id),
+    org_id: str = Depends(require_org_admin),
 ):
     hotel = Hotel(name=request.name, clerk_organization_id=org_id)
     session.add(hotel)
