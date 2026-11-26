@@ -3,10 +3,12 @@ import { auth } from "@clerk/nextjs/server";
 import EnquiriesDashboard, {
   type EnquirySummary,
 } from "@/components/enquiries-dashboard";
+import { connection } from "next/server";
 
 const API_URL = process.env.FASTAPI_URL ?? "http://127.0.0.1:8000";
 
 async function ProtectedDashboard() {
+  await connection();
   const { getToken } = await auth.protect();
   const token = await getToken();
 

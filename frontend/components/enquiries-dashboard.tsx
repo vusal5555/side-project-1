@@ -29,6 +29,7 @@ import {
 import { useMemo, useState, useEffect, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
+import { OrganizationSwitcher } from "@clerk/nextjs";
 
 export type EnquirySummary = {
   id: number;
@@ -533,14 +534,19 @@ export default function EnquiriesDashboard({
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />{" "}
               AI-assisted workspace
             </span>
-            <div
-              className="flex h-9 w-9 items-center justify-center"
-              aria-label="Account menu"
-            >
+            <div className="flex items-center gap-2" aria-label="Account menu">
               <UserButton
                 appearance={{
                   elements: {
                     avatarBox: "h-9 w-9",
+                  },
+                }}
+              />
+              <OrganizationSwitcher
+                appearance={{
+                  elements: {
+                    rootBox: "flex items-center",
+                    organizationSwitcherTrigger: "h-9 rounded-lg px-2 py-0",
                   },
                 }}
               />

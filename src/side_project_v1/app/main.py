@@ -4,12 +4,12 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
 from langchain_core.exceptions import OutputParserException
 from openai import APIConnectionError, InternalServerError, RateLimitError
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from side_project_v1.app.auth import require_user
-from side_project_v1.app.db.models import Enquiry, Reservation, ReviewEvent
+from side_project_v1.app.auth import require_org_id, require_organization, require_user
+from side_project_v1.app.db.models import Enquiry, Hotel, Reservation, ReviewEvent
 from side_project_v1.app.db.session import get_db
 from side_project_v1.app.schemas.reservation import UpdateReservation
 from side_project_v1.app.services.enquiry_service import save_enquiry
@@ -19,6 +19,12 @@ from side_project_v1.app.services.room_booking_agent import (
 )
 
 app = FastAPI()
+
+
+class CreateHotel(BaseModel):
+    name: str = Field(min_length=1)
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class EmailRequest(BaseModel):
@@ -223,3 +229,28 @@ def delete_enquiry(
     session.delete(enquiry)
     session.commit()
     return {"message": "Enquiry deleted successfully"}
+
+
+@app.get("/api/v1/hotels")
+def get_hotels(
+    session: Session = Depends(get_db),
+    org_id: str = Depends(require_organization),
+):
+    hotels = session.scalars(
+        select(Hotel).where(Hotel.clerk_organization_id == org_id)
+    ).all()
+
+    return [{"id": hotel.id, "name": hotel.name} for hotel in hotels]
+
+
+@app.post("/api/v1/hotels", status_code=201)
+def create_hotel(
+    request: CreateHotel,
+    session: Session = Depends(get_db),
+    org_id: str = Depends(require_org_id),
+):
+    hotel = Hotel(name=request.name, clerk_organization_id=org_id)
+    session.add(hotel)
+    session.commit()
+    session.refresh(hotel)
+    return {"id": hotel.id, "name": hotel.name}

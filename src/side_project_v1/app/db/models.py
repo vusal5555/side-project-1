@@ -14,6 +14,11 @@ class Enquiry(Base):
     __tablename__ = "enquiries"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    hotel_id: Mapped[int | None] = mapped_column(
+        ForeignKey("hotels.id"),
+        nullable=True,
+        index=True,
+    )
     email_content: Mapped[str] = mapped_column(Text)
     email_date: Mapped[date] = mapped_column(Date)
 
@@ -75,3 +80,20 @@ class ReviewEvent(Base):
     )
 
     enquiry: Mapped[Enquiry] = relationship(back_populates="review_events")
+
+
+class Hotel(Base):
+    __tablename__ = "hotels"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    clerk_organization_id: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+        index=True,
+    )
+
+    name: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
