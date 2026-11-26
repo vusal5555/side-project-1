@@ -7,10 +7,14 @@ import EnquiriesDashboard, {
 const API_URL = process.env.FASTAPI_URL ?? "http://127.0.0.1:8000";
 
 async function ProtectedDashboard() {
-  await auth.protect();
+  const { getToken } = await auth.protect();
+  const token = await getToken();
 
   const response = await fetch(`${API_URL}/api/v1/enquiries`, {
     cache: "no-store",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 
   if (!response.ok) {

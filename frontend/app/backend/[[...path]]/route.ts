@@ -16,7 +16,10 @@ async function handler(request: NextRequest, { params }: Context) {
 
   const { path } = await params;
 
-  if (!path.length || !["enquiries", "reservations"].includes(path[0])) {
+  if (
+    !path.length ||
+    !["enquiries", "reservations", "auth"].includes(path[0])
+  ) {
     return NextResponse.json({ detail: "Not found" }, { status: 404 });
   }
 

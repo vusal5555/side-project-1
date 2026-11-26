@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from side_project_v1.app.auth import require_user
 from side_project_v1.app.db.models import Enquiry, Reservation, ReviewEvent
 from side_project_v1.app.db.session import get_db
 from side_project_v1.app.schemas.reservation import UpdateReservation
@@ -35,7 +36,11 @@ def read_root():
     return {"message": "Hello, World!"}
 
 
-@app.post("/api/v1/reservations/extract", response_model=RoomBooking)
+@app.post(
+    "/api/v1/reservations/extract",
+    response_model=RoomBooking,
+    dependencies=[Depends(require_user)],
+)
 def extract_reservations(request: EmailRequest):
     try:
         return extract_room_bookings(request.email, request.email_date)
@@ -53,7 +58,11 @@ def extract_reservations(request: EmailRequest):
 
 
 @app.post("/api/v1/enquiries", status_code=201)
-def create_enquiry(request: EmailRequest, session: Session = Depends(get_db)):
+def create_enquiry(
+    request: EmailRequest,
+    session: Session = Depends(get_db),
+    user_id: str = Depends(require_user),
+):
     booking = extract_room_bookings(request.email, request.email_date)
     enquiry = save_enquiry(session, request.email, request.email_date, booking)
     return {
@@ -64,7 +73,9 @@ def create_enquiry(request: EmailRequest, session: Session = Depends(get_db)):
 
 
 @app.get("/api/v1/enquiries")
-def get_enquiries(session: Session = Depends(get_db)):
+def get_enquiries(
+    session: Session = Depends(get_db), user_id: str = Depends(require_user)
+):
     enquiries = session.scalars(
         select(Enquiry).order_by(Enquiry.created_at.desc())
     ).all()
@@ -81,7 +92,11 @@ def get_enquiries(session: Session = Depends(get_db)):
 
 
 @app.get("/api/v1/enquiries/{enquiry_id}", status_code=200)
-def get_enquiry(enquiry_id: int, session: Session = Depends(get_db)):
+def get_enquiry(
+    enquiry_id: int,
+    session: Session = Depends(get_db),
+    user_id: str = Depends(require_user),
+):
 
     enquiry = session.get(Enquiry, enquiry_id)
     if not enquiry:
@@ -105,7 +120,11 @@ def get_enquiry(enquiry_id: int, session: Session = Depends(get_db)):
 
 
 @app.post("/api/v1/enquiries/{enquiry_id}/approve")
-def approve_enquiry(enquiry_id: int, session: Session = Depends(get_db)):
+def approve_enquiry(
+    enquiry_id: int,
+    session: Session = Depends(get_db),
+    user_id: str = Depends(require_user),
+):
     enquiry = session.get(Enquiry, enquiry_id)
     if not enquiry:
         raise HTTPException(status_code=404, detail="Enquiry not found")
@@ -136,6 +155,7 @@ def update_reservation(
     reservation_id: int,
     request: UpdateReservation,
     session: Session = Depends(get_db),
+    user_id: str = Depends(require_user),
 ):
     reservation = session.get(Reservation, reservation_id)
     if not reservation:
@@ -190,6 +210,7 @@ def update_reservation(
 def delete_enquiry(
     enquiry_id: int,
     session: Session = Depends(get_db),
+    user_id: str = Depends(require_user),
 ):
     enquiry = session.get(Enquiry, enquiry_id)
 
@@ -201,3 +222,4 @@ def delete_enquiry(
 
     session.delete(enquiry)
     session.commit()
+    return {"message": "Enquiry deleted successfully"}
