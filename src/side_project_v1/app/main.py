@@ -1,5 +1,7 @@
+import os
 from datetime import date
 
+from clerk_backend_api import Clerk
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.encoders import jsonable_encoder
 from langchain_core.exceptions import OutputParserException
@@ -9,11 +11,19 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from side_project_v1.app.auth import (
+    OrganizationUser,
     require_org_admin,
     require_organization,
+    require_organization_user,
     require_user,
 )
-from side_project_v1.app.db.models import Enquiry, Hotel, Reservation, ReviewEvent
+from side_project_v1.app.db.models import (
+    Enquiry,
+    Hotel,
+    HotelStaffAccess,
+    Reservation,
+    ReviewEvent,
+)
 from side_project_v1.app.db.session import get_db
 from side_project_v1.app.schemas.reservation import UpdateReservation
 from side_project_v1.app.services.enquiry_service import save_enquiry
@@ -38,6 +48,10 @@ class EmailRequest(BaseModel):
 
 class CreateEnquiryRequest(EmailRequest):
     hotel_id: int = Field(gt=0)
+
+
+class AssignHotelStaff(BaseModel):
+    clerk_user_id: str = Field(min_length=1)
 
 
 @app.get("/health")
@@ -313,11 +327,17 @@ def delete_enquiry(
 @app.get("/api/v1/hotels")
 def get_hotels(
     session: Session = Depends(get_db),
-    org_id: str = Depends(require_organization),
+    user: OrganizationUser = Depends(require_organization_user),
 ):
-    hotels = session.scalars(
-        select(Hotel).where(Hotel.clerk_organization_id == org_id)
-    ).all()
+    query = select(Hotel).where(Hotel.clerk_organization_id == user.org_id)
+
+    if not user.is_admin:
+        query = query.join(
+            HotelStaffAccess,
+            HotelStaffAccess.hotel_id == Hotel.id,
+        ).where(HotelStaffAccess.clerk_user_id == user.user_id)
+
+    hotels = session.scalars(query).all()
 
     return [{"id": hotel.id, "name": hotel.name} for hotel in hotels]
 
@@ -333,3 +353,57 @@ def create_hotel(
     session.commit()
     session.refresh(hotel)
     return {"id": hotel.id, "name": hotel.name}
+
+
+@app.post("/api/v1/hotels/{hotel_id}/staff", status_code=201)
+def add_hotel_staff(
+    hotel_id: int,
+    request: AssignHotelStaff,
+    session: Session = Depends(get_db),
+    org_id: str = Depends(require_org_admin),
+):
+
+    hotel = session.scalar(
+        select(Hotel).where(
+            Hotel.id == hotel_id,
+            Hotel.clerk_organization_id == org_id,
+        )
+    )
+    if hotel is None:
+        raise HTTPException(status_code=404, detail="Hotel not found")
+
+    with Clerk(bearer_auth=os.environ["CLERK_SECRET_KEY"]) as clerk:
+        memberships = clerk.organization_memberships.list(
+            organization_id=org_id,
+            user_id=[request.clerk_user_id],
+            limit=1,
+        )
+
+    is_member = any(
+        m.public_user_data is not None
+        and m.public_user_data.user_id == request.clerk_user_id
+        for m in memberships.data
+    )
+
+    if not is_member:
+        raise HTTPException(
+            status_code=404, detail="User is not a member of the organization"
+        )
+
+    existing = session.scalar(
+        select(HotelStaffAccess).where(
+            HotelStaffAccess.hotel_id == hotel_id,
+            HotelStaffAccess.clerk_user_id == request.clerk_user_id,
+        )
+    )
+
+    if existing:
+        raise HTTPException(status_code=409, detail="Employee already assigned")
+
+    staff_access = HotelStaffAccess(
+        hotel_id=hotel_id,
+        clerk_user_id=request.clerk_user_id,
+    )
+    session.add(staff_access)
+    session.commit()
+    return {"message": "Employee assigned successfully"}

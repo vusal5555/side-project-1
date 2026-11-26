@@ -1,14 +1,25 @@
 from datetime import date
 
 import httpx
+import pytest
 from fastapi.testclient import TestClient
 from langchain_core.exceptions import OutputParserException
 from openai import APIConnectionError
 
 from side_project_v1.app import main
+from side_project_v1.app.auth import require_user
 from side_project_v1.app.schemas.reservation import RoomBooking
 
 client = TestClient(main.app)
+
+
+@pytest.fixture(autouse=True)
+def authenticated_user():
+    main.app.dependency_overrides[require_user] = lambda: "test_user_123"
+
+    yield
+
+    main.app.dependency_overrides.pop(require_user, None)
 
 
 def test_successful_extraction(monkeypatch):

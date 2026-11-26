@@ -13,9 +13,9 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
+from side_project_v1.app import auth as auth_module
 from side_project_v1.app import main as main_module
-from side_project_v1.app.auth import require_user
-from side_project_v1.app.db.models import Base
+from side_project_v1.app.db.models import Base, Hotel
 from side_project_v1.app.db.session import get_db
 from side_project_v1.app.schemas.reservation import RoomBooking, RoomPeriod
 
@@ -45,7 +45,27 @@ def client(test_engine, monkeypatch):
         yield db
 
     main_module.app.dependency_overrides[get_db] = override_get_db
-    main_module.app.dependency_overrides[require_user] = lambda: "test_user_123"
+
+    # Pretend that Clerk authenticated a test user for normal workflow tests.
+    # This overrides authentication only inside pytest, not in the real app.
+    main_module.app.dependency_overrides[auth_module.require_user] = lambda: (
+        "test_user_123"
+    )
+    main_module.app.dependency_overrides[auth_module.require_organization] = lambda: (
+        "org_test_workflow"
+    )
+    # Account for either the current admin dependency name or the renamed one.
+    for dep_name in ("require_org_id", "require_org_admin"):
+        dependency = getattr(auth_module, dep_name, None)
+        if dependency is not None:
+            main_module.app.dependency_overrides[dependency] = lambda: (
+                "org_test_workflow"
+            )
+
+    # All integration test enquiries now belong to this test hotel.
+    hotel = Hotel(name="Workflow Test Hotel", clerk_organization_id="org_test_workflow")
+    db.add(hotel)
+    db.flush()
 
     # Keep LLM calls out of integration tests: deterministic extraction.
     def fake_extract(email: str, email_date: date) -> RoomBooking:
@@ -70,18 +90,27 @@ def client(test_engine, monkeypatch):
             yield test_client
     finally:
         main_module.app.dependency_overrides.pop(get_db, None)
-        main_module.app.dependency_overrides.pop(require_user, None)
+        main_module.app.dependency_overrides.pop(auth_module.require_user, None)
+        main_module.app.dependency_overrides.pop(auth_module.require_organization, None)
+        for dep_name in ("require_org_id", "require_org_admin"):
+            dependency = getattr(auth_module, dep_name, None)
+            if dependency is not None:
+                main_module.app.dependency_overrides.pop(dependency, None)
         db.close()
         transaction.rollback()
         connection.close()
 
 
 def create_enquiry(client: TestClient) -> int:
+    hotels = client.get("/api/v1/hotels")
+    assert hotels.status_code == 200, hotels.text
+    hotel_id = hotels.json()[0]["id"]
     response = client.post(
         "/api/v1/enquiries",
         json={
             "email": "Please book a double room for two adults, Dec 12–15.",
             "email_date": "2026-11-25",
+            "hotel_id": hotel_id,
         },
     )
     assert response.status_code == 201, response.text
@@ -228,6 +257,9 @@ def test_ai_parser_failure_returns_502(client, monkeypatch):
     assert response.status_code == 502, response.text
 
 
+# --- Real authentication-gate checks (no require_user override) ---
+
+
 @pytest.mark.parametrize(
     ("method", "path", "body"),
     [
@@ -236,40 +268,28 @@ def test_ai_parser_failure_returns_502(client, monkeypatch):
         (
             "POST",
             "/api/v1/enquiries",
-            {
-                "email": "One room for two adults",
-                "email_date": "2026-11-26",
-            },
+            {"email": "One room for two adults", "email_date": "2026-11-26"},
         ),
         ("POST", "/api/v1/enquiries/1/approve", None),
-        (
-            "PATCH",
-            "/api/v1/reservations/1",
-            {"num_adults": 2},
-        ),
+        ("PATCH", "/api/v1/reservations/1", {"num_adults": 2}),
         ("DELETE", "/api/v1/enquiries/1", None),
         (
             "POST",
             "/api/v1/reservations/extract",
-            {
-                "email": "One room for two adults",
-                "email_date": "2026-11-26",
-            },
+            {"email": "One room for two adults", "email_date": "2026-11-26"},
         ),
     ],
 )
 def test_requires_authentication(method, path, body):
+    # No dependency override and no Authorization header: real auth must deny.
     with TestClient(main_module.app) as anonymous_client:
-        response = anonymous_client.request(
-            method,
-            path,
-            json=body,
-        )
+        response = anonymous_client.request(method, path, json=body)
 
     assert response.status_code == 401, response.text
 
 
 def test_invalid_clerk_token_is_rejected():
+    # Calls the real require_user dependency; uses no actual Clerk login.
     with TestClient(main_module.app) as anonymous_client:
         response = anonymous_client.get(
             "/api/v1/enquiries",

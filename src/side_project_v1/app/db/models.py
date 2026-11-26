@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Any
 
-from sqlalchemy import Date, DateTime, ForeignKey, String, Text, func
+from sqlalchemy import Date, DateTime, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -96,4 +96,28 @@ class Hotel(Base):
     name: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
+    )
+
+
+class HotelStaffAccess(Base):
+    __tablename__ = "hotel_staff_access"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    hotel_id: Mapped[int] = mapped_column(
+        ForeignKey("hotels.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+
+    clerk_user_id: Mapped[str] = mapped_column(
+        String(255),
+        nullable=False,
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "hotel_id",
+            "clerk_user_id",
+            name="uq_hotel_staff_access",
+        ),
     )

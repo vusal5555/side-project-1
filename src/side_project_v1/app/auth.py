@@ -1,4 +1,5 @@
 import os
+from dataclasses import dataclass
 
 from clerk_backend_api import (
     AuthenticateRequestOptions,
@@ -11,6 +12,13 @@ load_dotenv()
 
 CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY")
 CLERK_JWT_KEY = os.getenv("CLERK_JWT_KEY")
+
+
+@dataclass
+class OrganizationUser:
+    user_id: str
+    org_id: str
+    is_admin: bool
 
 
 def get_clerk_session(request: Request):
@@ -69,3 +77,20 @@ def require_org_admin(request: Request):
         )
 
     return org_id
+
+
+def require_organization_user(request: Request) -> OrganizationUser:
+    state = get_clerk_session(request)
+
+    org_id = state.payload.get("org_id")
+    if not org_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Select an organization first",
+        )
+
+    return OrganizationUser(
+        user_id=state.payload["sub"],
+        org_id=org_id,
+        is_admin=state.payload.get("org_role") in ("admin", "org:admin"),
+    )
