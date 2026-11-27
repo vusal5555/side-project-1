@@ -13,7 +13,6 @@ from sqlalchemy.orm import Session
 from side_project_v1.app.auth import (
     OrganizationUser,
     require_org_admin,
-    require_organization,
     require_organization_user,
     require_user,
 )
@@ -27,6 +26,7 @@ from side_project_v1.app.db.models import (
 from side_project_v1.app.db.session import get_db
 from side_project_v1.app.schemas.reservation import UpdateReservation
 from side_project_v1.app.services.enquiry_service import save_enquiry
+from side_project_v1.app.services.hotel_access import check_hotel_access
 from side_project_v1.app.services.room_booking_agent import (
     RoomBooking,
     extract_room_bookings,
@@ -93,21 +93,15 @@ def extract_reservations(request: EmailRequest):
 def create_enquiry(
     request: CreateEnquiryRequest,
     session: Session = Depends(get_db),
-    org_id: str = Depends(require_organization),
+    user: OrganizationUser = Depends(require_organization_user),
 ):
 
-    hotel = session.scalar(
-        select(Hotel).where(
-            Hotel.id == request.hotel_id,
-            Hotel.clerk_organization_id == org_id,
-        )
+    hotel = check_hotel_access(
+        session=session,
+        hotel_id=request.hotel_id,
+        user=user,
     )
 
-    if hotel is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Hotel not found",
-        )
     booking = extract_room_bookings(request.email, request.email_date)
     enquiry = save_enquiry(
         session, hotel.id, request.email, request.email_date, booking
@@ -123,14 +117,21 @@ def create_enquiry(
 @app.get("/api/v1/enquiries", dependencies=[Depends(require_user)])
 def get_enquiries(
     session: Session = Depends(get_db),
-    org_id: str = Depends(require_organization),
+    user: OrganizationUser = Depends(require_organization_user),
 ):
-    enquiries = session.scalars(
+    query = (
         select(Enquiry)
         .join(Hotel, Enquiry.hotel_id == Hotel.id)
-        .where(Hotel.clerk_organization_id == org_id)
-        .order_by(Enquiry.created_at.desc())
-    ).all()
+        .where(Hotel.clerk_organization_id == user.org_id)
+    )
+
+    if not user.is_admin:
+        query = query.join(
+            HotelStaffAccess,
+            Hotel.id == HotelStaffAccess.hotel_id,
+        ).where(HotelStaffAccess.clerk_user_id == user.user_id)
+
+    enquiries = session.scalars(query.order_by(Enquiry.created_at.desc())).all()
 
     return [
         {
@@ -151,20 +152,22 @@ def get_enquiries(
 def get_enquiry(
     enquiry_id: int,
     session: Session = Depends(get_db),
-    org_id: str = Depends(require_organization),
+    user: OrganizationUser = Depends(require_organization_user),
 ):
 
-    enquiry = session.scalar(
-        select(Enquiry)
-        .join(Hotel, Enquiry.hotel_id == Hotel.id)
-        .where(
-            Enquiry.id == enquiry_id,
-            Hotel.clerk_organization_id == org_id,
-        )
-    )
+    enquiry = session.get(Enquiry, enquiry_id)
 
-    if not enquiry:
-        raise HTTPException(status_code=404, detail="Enquiry not found")
+    if enquiry is None or enquiry.hotel_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Enquiry not found",
+        )
+
+    check_hotel_access(
+        session=session,
+        hotel_id=enquiry.hotel_id,
+        user=user,
+    )
 
     return {
         "id": enquiry.id,
@@ -189,18 +192,21 @@ def get_enquiry(
 def approve_enquiry(
     enquiry_id: int,
     session: Session = Depends(get_db),
-    org_id: str = Depends(require_organization),
+    user: OrganizationUser = Depends(require_organization_user),
 ):
-    enquiry = session.scalar(
-        select(Enquiry)
-        .join(Hotel, Enquiry.hotel_id == Hotel.id)
-        .where(
-            Enquiry.id == enquiry_id,
-            Hotel.clerk_organization_id == org_id,
+    enquiry = session.get(Enquiry, enquiry_id)
+
+    if enquiry is None or enquiry.hotel_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Enquiry not found",
         )
+
+    check_hotel_access(
+        session=session,
+        hotel_id=enquiry.hotel_id,
+        user=user,
     )
-    if not enquiry:
-        raise HTTPException(status_code=404, detail="Enquiry not found")
 
     if enquiry.status == "approved":
         raise HTTPException(
@@ -230,26 +236,26 @@ def update_reservation(
     reservation_id: int,
     request: UpdateReservation,
     session: Session = Depends(get_db),
-    org_id: str = Depends(require_organization),
+    user: OrganizationUser = Depends(require_organization_user),
 ):
     reservation = session.get(Reservation, reservation_id)
-    if not reservation:
+
+    if reservation is None:
         raise HTTPException(status_code=404, detail="Reservation not found")
 
-    enquiry = session.scalar(
-        select(Enquiry)
-        .join(Hotel, Enquiry.hotel_id == Hotel.id)
-        .where(
-            Enquiry.id == reservation.enquiry_id,
-            Hotel.clerk_organization_id == org_id,
-        )
-    )
+    enquiry = session.get(Enquiry, reservation.enquiry_id)
 
-    if enquiry is None:
+    if enquiry is None or enquiry.hotel_id is None:
         raise HTTPException(
             status_code=404,
             detail="Reservation not found",
         )
+
+    check_hotel_access(
+        session=session,
+        hotel_id=enquiry.hotel_id,
+        user=user,
+    )
 
     if enquiry.status == "approved":
         raise HTTPException(
@@ -302,19 +308,21 @@ def update_reservation(
 def delete_enquiry(
     enquiry_id: int,
     session: Session = Depends(get_db),
-    org_id: str = Depends(require_organization),
+    user: OrganizationUser = Depends(require_organization_user),
 ):
-    enquiry = session.scalar(
-        select(Enquiry)
-        .join(Hotel, Enquiry.hotel_id == Hotel.id)
-        .where(
-            Enquiry.id == enquiry_id,
-            Hotel.clerk_organization_id == org_id,
-        )
-    )
+    enquiry = session.get(Enquiry, enquiry_id)
 
-    if enquiry is None:
-        raise HTTPException(404, "Enquiry not found")
+    if enquiry is None or enquiry.hotel_id is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Enquiry not found",
+        )
+
+    check_hotel_access(
+        session=session,
+        hotel_id=enquiry.hotel_id,
+        user=user,
+    )
 
     if enquiry.status == "approved":
         raise HTTPException(409, "Cannot delete approved enquiry")
