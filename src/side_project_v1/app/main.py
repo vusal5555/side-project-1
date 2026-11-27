@@ -2,13 +2,22 @@ import os
 from datetime import date
 
 from clerk_backend_api import Clerk
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Response
 from fastapi.encoders import jsonable_encoder
 from langchain_core.exceptions import OutputParserException
 from openai import APIConnectionError, InternalServerError, RateLimitError
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PositiveInt,
+    ValidationError,
+    field_validator,
+)
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import delete
 
 from side_project_v1.app.auth import (
     OrganizationUser,
@@ -52,6 +61,27 @@ class CreateEnquiryRequest(EmailRequest):
 
 class AssignHotelStaff(BaseModel):
     clerk_user_id: str = Field(min_length=1)
+
+
+class SetStaffHotels(BaseModel):
+    hotel_ids: list[PositiveInt] = Field(max_length=10000)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class BulkCreateHotelsRequest(BaseModel):
+    names: list[str] = Field(min_length=1, max_length=500)
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator("names")
+    @classmethod
+    def clean_names(cls, names: list[str]) -> list[str]:
+        cleaned = [name.strip() for name in names]
+        if any(not name or len(name) > 255 for name in cleaned):
+            raise ValueError("Each hotel name must be 1-255 characters long")
+        if len({name.casefold() for name in cleaned}) != len(cleaned):
+            raise ValueError("Duplicate hotel names in request")
+        return cleaned
 
 
 @app.get("/health")
@@ -103,6 +133,7 @@ def create_enquiry(
     )
 
     booking = extract_room_bookings(request.email, request.email_date)
+    print("AI EXTRACTION:", booking.model_dump(mode="json"))
     enquiry = save_enquiry(
         session, hotel.id, request.email, request.email_date, booking
     )
@@ -444,3 +475,173 @@ def delete_hotel_staff(
 
     session.delete(assignment)
     session.commit()
+
+
+@app.get("/api/v1/hotel-access")
+def get_hotel_access(
+    clerk_user_id: str,
+    session: Session = Depends(get_db),
+    org_id: str = Depends(require_org_admin),
+):
+    hotel_ids = session.scalars(
+        select(HotelStaffAccess.hotel_id)
+        .join(Hotel, Hotel.id == HotelStaffAccess.hotel_id)
+        .where(
+            Hotel.clerk_organization_id == org_id,
+            HotelStaffAccess.clerk_user_id == clerk_user_id,
+        )
+    ).all()
+
+    return {
+        "clerk_user_id": clerk_user_id,
+        "hotel_ids": hotel_ids,
+    }
+
+
+@app.put("/api/v1/staff/{clerk_user_id}/hotels")
+def set_staff_hotels(
+    clerk_user_id: str,
+    request: SetStaffHotels,
+    session: Session = Depends(get_db),
+    org_id: str = Depends(require_org_admin),
+):
+    # Verify that this employee belongs to the organization.
+    with Clerk(bearer_auth=os.environ["CLERK_SECRET_KEY"]) as clerk:
+        memberships = clerk.organization_memberships.list(
+            organization_id=org_id,
+            user_id=[clerk_user_id],
+            limit=1,
+        )
+
+    is_member = any(
+        m.public_user_data is not None and m.public_user_data.user_id == clerk_user_id
+        for m in memberships.data
+    )
+
+    if not is_member:
+        raise HTTPException(403, "User is not an organization member")
+
+    # Check that every requested hotel belongs to this organization.
+    requested_ids = set(request.hotel_ids)
+
+    valid_ids = set(
+        session.scalars(
+            select(Hotel.id).where(
+                Hotel.id.in_(requested_ids),
+                Hotel.clerk_organization_id == org_id,
+            )
+        ).all()
+    )
+
+    if requested_ids != valid_ids:
+        raise HTTPException(404, "One or more hotels not found")
+
+    # Retrieve this employee's existing assignments.
+    existing = session.scalars(
+        select(HotelStaffAccess)
+        .join(Hotel, Hotel.id == HotelStaffAccess.hotel_id)
+        .where(
+            Hotel.clerk_organization_id == org_id,
+            HotelStaffAccess.clerk_user_id == clerk_user_id,
+        )
+    ).all()
+
+    existing_ids = {a.hotel_id for a in existing}
+
+    # Remove assignments that are no longer selected.
+    for assignment in existing:
+        if assignment.hotel_id not in requested_ids:
+            session.delete(assignment)
+
+    # Add newly selected hotels.
+    for hotel_id in requested_ids - existing_ids:
+        session.add(
+            HotelStaffAccess(
+                hotel_id=hotel_id,
+                clerk_user_id=clerk_user_id,
+            )
+        )
+
+    session.commit()
+
+    return {
+        "clerk_user_id": clerk_user_id,
+        "hotel_ids": sorted(requested_ids),
+    }
+
+
+@app.delete("/api/v1/hotels/{hotel_id}", status_code=204)
+def delete_hotel(
+    hotel_id: int,
+    session: Session = Depends(get_db),
+    org_id: str = Depends(require_org_admin),
+):
+    # Lock the property row while checking its references and deleting it.
+    # Avoid cross-organization deletion even when IDs are guessed.
+    hotel = session.scalar(
+        select(Hotel)
+        .where(Hotel.id == hotel_id, Hotel.clerk_organization_id == org_id)
+        .with_for_update()
+    )
+    if hotel is None:
+        raise HTTPException(status_code=404, detail="Hotel not found")
+
+    # Never silently delete or orphan reservation enquiries.
+    has_enquiry = session.scalar(
+        select(Enquiry.id).where(Enquiry.hotel_id == hotel_id).limit(1)
+    )
+    if has_enquiry is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="This hotel has existing enquiries and cannot be deleted. Archive it instead.",
+        )
+
+    # Staff assignment rows refer to the hotel through a foreign key.
+    try:
+        session.execute(
+            delete(HotelStaffAccess).where(HotelStaffAccess.hotel_id == hotel_id)
+        )
+        session.delete(hotel)
+        session.commit()
+    except IntegrityError:
+        session.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="This hotel is referenced by other records and cannot be deleted.",
+        )
+
+    return Response(status_code=204)
+
+
+@app.post("/api/v1/hotels/bulk", status_code=201)
+def create_hotels_bulk(
+    request: BulkCreateHotelsRequest,
+    session: Session = Depends(get_db),
+    org_id: str = Depends(require_org_admin),
+):
+    # Look only inside the active organization.
+    existing_names = session.scalars(
+        select(Hotel.name).where(Hotel.clerk_organization_id == org_id)
+    ).all()
+    existing_normalized = {name.casefold() for name in existing_names}
+
+    duplicates = [
+        name for name in request.names if name.casefold() in existing_normalized
+    ]
+    if duplicates:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Hotel already exists in this organization: {duplicates[0]}",
+        )
+
+    # All inserts use a single transaction. No partial results on a failed commit.
+    hotels = [Hotel(name=name, clerk_organization_id=org_id) for name in request.names]
+    try:
+        session.add_all(hotels)
+        session.flush()  # Obtains generated IDs before the response.
+        result = [{"id": hotel.id, "name": hotel.name} for hotel in hotels]
+        session.commit()
+        return result
+    except Exception:
+        session.rollback()
+        raise

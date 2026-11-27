@@ -1,22 +1,52 @@
 import { Suspense } from "react";
 import { auth } from "@clerk/nextjs/server";
+import { OrganizationSwitcher } from "@clerk/nextjs";
+import { redirect } from "next/navigation";
+
 import EnquiriesDashboard, {
   type EnquirySummary,
 } from "@/components/enquiries-dashboard";
-import { connection } from "next/server";
 
 const API_URL = process.env.FASTAPI_URL ?? "http://127.0.0.1:8000";
 
-async function ProtectedDashboard() {
-  await connection();
-  const { getToken } = await auth.protect();
+async function DashboardContent() {
+  const { userId, orgId, getToken } = await auth();
+
+  if (!userId) {
+    redirect("/sign-in");
+  }
+
+  // Personal account: no hotel organization selected.
+  if (!orgId) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50 p-6">
+        <section className="w-full max-w-md rounded-xl bg-white p-8 shadow-sm">
+          <h1 className="text-2xl font-bold text-[#17233b]">
+            Welcome to Hotel AI
+          </h1>
+
+          <p className="my-5 text-sm text-slate-600">
+            Create a hotel organization or select an organization you've already
+            joined.
+          </p>
+
+          <OrganizationSwitcher
+            afterCreateOrganizationUrl="/"
+            afterSelectOrganizationUrl="/"
+          />
+        </section>
+      </main>
+    );
+  }
+
+  // Only fetch organization enquiries when an org is active.
   const token = await getToken();
 
   const response = await fetch(`${API_URL}/api/v1/enquiries`, {
-    cache: "no-store",
     headers: {
       Authorization: `Bearer ${token}`,
     },
+    cache: "no-store",
   });
 
   if (!response.ok) {
@@ -30,14 +60,8 @@ async function ProtectedDashboard() {
 
 export default function Home() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center bg-[#f5f7fb] text-sm font-medium text-slate-500">
-          Loading reservation workspace...
-        </div>
-      }
-    >
-      <ProtectedDashboard />
+    <Suspense fallback={<p>Loading workspace...</p>}>
+      <DashboardContent />
     </Suspense>
   );
 }

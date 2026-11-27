@@ -26,10 +26,11 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useMemo, useState, useEffect, type FormEvent } from "react";
+import { useMemo, useState, useEffect, useRef, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { UserButton } from "@clerk/nextjs";
-import { OrganizationSwitcher } from "@clerk/nextjs";
+import { UserButton, useOrganization } from "@clerk/nextjs";
+import HotelOrganizationSwitcher from "@/components/hotel-organization-switcher";
+import HotelPicker from "@/components/hotel-picker";
 
 export type EnquirySummary = {
   id: number;
@@ -179,6 +180,7 @@ export default function EnquiriesDashboard({
   const [mobileNav, setMobileNav] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [newEmail, setNewEmail] = useState("");
+  const [newHotelId, setNewHotelId] = useState<number | null>(null);
   const [newDate, setNewDate] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
@@ -191,6 +193,27 @@ export default function EnquiriesDashboard({
   const [actionError, setActionError] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [draft, setDraft] = useState<ReservationDraft | null>(null);
+
+  // The dashboard data is fetched server-side for the active Clerk organization.
+  // When an admin switches organizations, discard open dialogs and refetch it.
+  const { organization, isLoaded: organizationLoaded } = useOrganization();
+  const activeOrgId = organization?.id ?? null;
+  const previousOrgId = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (!organizationLoaded) return;
+    if (previousOrgId.current === undefined) {
+      previousOrgId.current = activeOrgId;
+      return;
+    }
+    if (previousOrgId.current !== activeOrgId) {
+      previousOrgId.current = activeOrgId;
+      setSelectedId(null);
+      setShowNew(false);
+      setNewHotelId(null);
+      router.refresh();
+    }
+  }, [organizationLoaded, activeOrgId, router]);
 
   const total = enquiries.length;
   const pending = enquiries.filter((e) => e.status === "needs_review").length;
@@ -210,6 +233,7 @@ export default function EnquiriesDashboard({
   const rows = view === "overview" ? filtered.slice(0, 6) : filtered;
 
   function openNewEnquiry() {
+    setNewHotelId(null);
     setNewDate(todayLocalDate());
     setCreateError("");
     setShowNew(true);
@@ -269,6 +293,10 @@ export default function EnquiriesDashboard({
       setCreateError("Please enter the guest email and received date.");
       return;
     }
+    if (newHotelId === null) {
+      setCreateError("Please select a hotel property.");
+      return;
+    }
 
     setCreating(true);
     setCreateError("");
@@ -276,7 +304,11 @@ export default function EnquiriesDashboard({
       const response = await fetch("/backend/enquiries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, email_date: newDate }),
+        body: JSON.stringify({
+          email,
+          email_date: newDate,
+          hotel_id: newHotelId,
+        }),
       });
       const result: unknown = await response.json().catch(() => null);
       if (!response.ok) {
@@ -288,6 +320,7 @@ export default function EnquiriesDashboard({
       setShowNew(false);
       setNewEmail("");
       setNewDate("");
+      setNewHotelId(null);
       setView("inbox");
       setFilter("all");
       setQuery("");
@@ -542,14 +575,7 @@ export default function EnquiriesDashboard({
                   },
                 }}
               />
-              <OrganizationSwitcher
-                appearance={{
-                  elements: {
-                    rootBox: "flex items-center",
-                    organizationSwitcherTrigger: "h-9 rounded-lg px-2 py-0",
-                  },
-                }}
-              />
+              <HotelOrganizationSwitcher />
             </div>
           </div>
         </header>
@@ -872,6 +898,11 @@ export default function EnquiriesDashboard({
               </button>
             </div>
             <form onSubmit={submitNew} className="space-y-4">
+              <HotelPicker
+                value={newHotelId}
+                onChange={setNewHotelId}
+                disabled={creating}
+              />
               <label className="block text-sm font-bold text-slate-700">
                 Email received on
                 <input

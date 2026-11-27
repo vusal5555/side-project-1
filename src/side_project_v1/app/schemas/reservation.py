@@ -63,7 +63,12 @@ class RoomBooking(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     reservations: list[RoomPeriod] = Field(
-        ..., description="All distinct requested accommodation blocks."
+        ...,
+        description=(
+            "All identifiable hotel stay blocks, including "
+            "partial reservations and existing stays. "
+            "An arrival date alone can form a reservation block."
+        ),
     )
 
 

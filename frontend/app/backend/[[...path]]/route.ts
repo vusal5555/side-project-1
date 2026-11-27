@@ -18,7 +18,14 @@ async function handler(request: NextRequest, { params }: Context) {
 
   if (
     !path.length ||
-    !["enquiries", "reservations", "auth", "hotels"].includes(path[0])
+    ![
+      "enquiries",
+      "reservations",
+      "auth",
+      "hotels",
+      "hotel-access",
+      "staff",
+    ].includes(path[0])
   ) {
     return NextResponse.json({ detail: "Not found" }, { status: 404 });
   }
@@ -74,4 +81,10 @@ async function handler(request: NextRequest, { params }: Context) {
   }
 }
 
-export { handler as GET, handler as POST, handler as PATCH, handler as DELETE };
+export {
+  handler as GET,
+  handler as POST,
+  handler as PATCH,
+  handler as DELETE,
+  handler as PUT,
+};
