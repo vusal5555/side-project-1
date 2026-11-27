@@ -415,3 +415,32 @@ def add_hotel_staff(
     session.add(staff_access)
     session.commit()
     return {"message": "Employee assigned successfully"}
+
+
+@app.delete("/api/v1/hotels/{hotel_id}/staff/{clerk_user_id}", status_code=204)
+def delete_hotel_staff(
+    hotel_id: int,
+    clerk_user_id: str,
+    session: Session = Depends(get_db),
+    org_id: str = Depends(require_org_admin),
+):
+    hotel = session.scalar(
+        select(Hotel).where(
+            Hotel.id == hotel_id,
+            Hotel.clerk_organization_id == org_id,
+        )
+    )
+    if hotel is None:
+        raise HTTPException(status_code=404, detail="Hotel not found")
+
+    assignment = session.scalar(
+        select(HotelStaffAccess).where(
+            HotelStaffAccess.hotel_id == hotel_id,
+            HotelStaffAccess.clerk_user_id == clerk_user_id,
+        )
+    )
+    if assignment is None:
+        raise HTTPException(status_code=404, detail="Staff access not found")
+
+    session.delete(assignment)
+    session.commit()

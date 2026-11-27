@@ -45,6 +45,13 @@ def tenants(monkeypatch):
     # These tests exercise organization WHERE clauses, not Clerk cryptography.
     app.dependency_overrides[auth_module.require_user] = lambda: actor["user_id"]
     app.dependency_overrides[auth_module.require_organization] = lambda: actor["org_id"]
+    app.dependency_overrides[auth_module.require_organization_user] = lambda: (
+        auth_module.OrganizationUser(
+            user_id=actor["user_id"],
+            org_id=actor["org_id"],
+            is_admin=True,
+        )
+    )
     # Support either the original or renamed admin dependency in the user's app.
     for dep_name in ("require_org_id", "require_org_admin"):
         dependency = getattr(auth_module, dep_name, None)
@@ -82,7 +89,9 @@ def tenants(monkeypatch):
                 ("org_test_beta", hotel_b),
             ):
                 actor["org_id"] = org
-                actor["user_id"] = "user_test_alpha" if org == "org_test_alpha" else "user_test_beta"
+                actor["user_id"] = (
+                    "user_test_alpha" if org == "org_test_alpha" else "user_test_beta"
+                )
                 response = client.post(
                     "/api/v1/enquiries",
                     json={
@@ -120,7 +129,7 @@ def test_each_org_sees_only_its_own_enquiries(tenants):
 def test_org_cannot_read_another_orgs_enquiry(tenants):
     client, actor, _, _, enquiries = tenants
     actor["org_id"] = "org_test_alpha"
-    response = client.get(f'/api/v1/enquiries/{enquiries["org_test_beta"]}')
+    response = client.get(f"/api/v1/enquiries/{enquiries['org_test_beta']}")
     assert response.status_code == 404, response.text
 
 
@@ -177,5 +186,5 @@ def test_org_cannot_list_another_orgs_hotels(tenants):
 def test_org_can_access_its_own_enquiry(tenants):
     client, actor, _, _, enquiries = tenants
     actor["org_id"] = "org_test_alpha"
-    response = client.get(f'/api/v1/enquiries/{enquiries["org_test_alpha"]}')
+    response = client.get(f"/api/v1/enquiries/{enquiries['org_test_alpha']}")
     assert response.status_code == 200, response.text

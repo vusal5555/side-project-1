@@ -54,6 +54,14 @@ def client(test_engine, monkeypatch):
     main_module.app.dependency_overrides[auth_module.require_organization] = lambda: (
         "org_test_workflow"
     )
+
+    main_module.app.dependency_overrides[auth_module.require_organization_user] = (
+        lambda: auth_module.OrganizationUser(
+            user_id="test_user_123",
+            org_id="org_test_workflow",
+            is_admin=True,
+        )
+    )
     # Account for either the current admin dependency name or the renamed one.
     for dep_name in ("require_org_id", "require_org_admin"):
         dependency = getattr(auth_module, dep_name, None)
@@ -92,6 +100,9 @@ def client(test_engine, monkeypatch):
         main_module.app.dependency_overrides.pop(get_db, None)
         main_module.app.dependency_overrides.pop(auth_module.require_user, None)
         main_module.app.dependency_overrides.pop(auth_module.require_organization, None)
+        main_module.app.dependency_overrides.pop(
+            auth_module.require_organization_user, None
+        )
         for dep_name in ("require_org_id", "require_org_admin"):
             dependency = getattr(auth_module, dep_name, None)
             if dependency is not None:
