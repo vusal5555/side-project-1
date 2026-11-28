@@ -26,7 +26,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useMemo, useState, useEffect, useRef, type FormEvent } from "react";
+import { useMemo, useState, useEffect, useRef, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
 import { UserButton, useOrganization } from "@clerk/nextjs";
 import HotelOrganizationSwitcher from "@/components/hotel-organization-switcher";
@@ -59,6 +59,8 @@ type EnquiryDetail = {
   created_at?: string | null;
   reservations: Reservation[];
 };
+
+const ENQUIRIES_PER_PAGE = 10;
 
 type View = "overview" | "inbox";
 type Filter = "all" | "needs_review" | "approved";
@@ -177,6 +179,7 @@ export default function EnquiriesDashboard({
   const [view, setView] = useState<View>("overview");
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [mobileNav, setMobileNav] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [newEmail, setNewEmail] = useState("");
@@ -211,6 +214,7 @@ export default function EnquiriesDashboard({
       setSelectedId(null);
       setShowNew(false);
       setNewHotelId(null);
+      setPage(1);
       router.refresh();
     }
   }, [organizationLoaded, activeOrgId, router]);
@@ -230,7 +234,19 @@ export default function EnquiriesDashboard({
     });
   }, [enquiries, filter, query]);
 
-  const rows = view === "overview" ? filtered.slice(0, 6) : filtered;
+  // Paginate the shared inbox list after status and search filters are applied.
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filtered.length / ENQUIRIES_PER_PAGE),
+  );
+  const currentPage = Math.min(page, totalPages);
+  const firstIndex = (currentPage - 1) * ENQUIRIES_PER_PAGE;
+  const rows =
+    view === "overview"
+      ? filtered.slice(0, 6)
+      : filtered.slice(firstIndex, firstIndex + ENQUIRIES_PER_PAGE);
+  const firstShown = filtered.length === 0 ? 0 : firstIndex + 1;
+  const lastShown = Math.min(firstIndex + ENQUIRIES_PER_PAGE, filtered.length);
 
   function openNewEnquiry() {
     setNewHotelId(null);
@@ -243,6 +259,7 @@ export default function EnquiriesDashboard({
     setView(nextView);
     setFilter(nextFilter);
     setQuery("");
+    setPage(1);
     setMobileNav(false);
   };
 
@@ -286,7 +303,7 @@ export default function EnquiriesDashboard({
     router.refresh();
   }
 
-  async function submitNew(event: FormEvent<HTMLFormElement>) {
+  async function submitNew(event: ChangeEvent<HTMLFormElement>) {
     event.preventDefault();
     const email = newEmail.trim();
     if (!email || !newDate) {
@@ -324,6 +341,7 @@ export default function EnquiriesDashboard({
       setView("inbox");
       setFilter("all");
       setQuery("");
+      setPage(1);
       router.refresh();
       // Our FastAPI create endpoint returns { id, status, reservations_count }.
       if (typeof result === "object" && result !== null && "id" in result) {
@@ -746,6 +764,7 @@ export default function EnquiriesDashboard({
                       key={key}
                       onClick={() => {
                         setFilter(key);
+                        setPage(1);
                         if (view === "overview") setView("inbox");
                       }}
                       className={cls(
@@ -767,7 +786,10 @@ export default function EnquiriesDashboard({
                 />
                 <input
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
+                  onChange={(e) => {
+                    setQuery(e.target.value);
+                    setPage(1);
+                  }}
                   placeholder="Search emails or enquiry ID"
                   className="h-10 w-full rounded-xl border border-slate-200 bg-[#fafbfd] pl-10 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-teal-400 focus:ring-2 focus:ring-teal-100"
                 />
@@ -839,17 +861,46 @@ export default function EnquiriesDashboard({
                 </div>
               )}
             </div>
-            <div className="flex items-center justify-between border-t border-slate-100 px-6 py-4 text-xs text-slate-500">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-6 py-4 text-xs text-slate-500">
               <span>
-                Showing {rows.length} of {filtered.length} matching enquiries
+                {view === "overview"
+                  ? `Showing ${rows.length} of ${filtered.length} matching enquiries`
+                  : `Showing ${firstShown}-${lastShown} of ${filtered.length} matching enquiries`}
               </span>
-              {view === "overview" && (
+              {view === "overview" ? (
                 <button
                   className="font-bold text-[#246d77]"
                   onClick={() => navigate("inbox")}
                 >
                   Full inbox <ArrowRight size={13} className="ml-1 inline" />
                 </button>
+              ) : (
+                <nav
+                  className="flex items-center gap-3"
+                  aria-label="Enquiry pages"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setPage((value) => Math.max(1, value - 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-lg border border-slate-200 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+                  <span aria-live="polite">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPage((value) => Math.min(totalPages, value + 1))
+                    }
+                    disabled={currentPage === totalPages}
+                    className="rounded-lg border border-slate-200 px-3 py-2 font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </nav>
               )}
             </div>
           </section>
